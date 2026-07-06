@@ -35,6 +35,7 @@ import de.danoeh.antennapod.playback.base.MediaItemAdapter;
 import de.danoeh.antennapod.playback.base.RewindAfterPauseUtils;
 import de.danoeh.antennapod.ui.appstartintent.MediaButtonStarter;
 import de.danoeh.antennapod.playback.service.R;
+import de.danoeh.antennapod.storage.database.ClipExporter;
 import de.danoeh.antennapod.storage.database.DBReader;
 import de.danoeh.antennapod.storage.preferences.PlaybackPreferences;
 import de.danoeh.antennapod.storage.preferences.UserPreferences;
@@ -78,6 +79,8 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
             = new SessionCommand("disable_sleep_timer", Bundle.EMPTY);
     public static final SessionCommand SESSION_COMMAND_EXTEND_SLEEP_TIMER
             = new SessionCommand("extend_sleep_timer", Bundle.EMPTY);
+    public static final SessionCommand SESSION_COMMAND_PODHEAD_CLIP
+            = new SessionCommand("podhead_clip", Bundle.EMPTY);
 
     private static final String EXTRA_VALUE = "value";
 
@@ -124,6 +127,7 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
                 .add(SESSION_COMMAND_SET_SLEEP_TIMER)
                 .add(SESSION_COMMAND_DISABLE_SLEEP_TIMER)
                 .add(SESSION_COMMAND_EXTEND_SLEEP_TIMER)
+                .add(SESSION_COMMAND_PODHEAD_CLIP)
                 .build();
         Player.Commands playerCommands = new Player.Commands.Builder()
                 .addAllCommands()
@@ -151,6 +155,14 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
     @UnstableApi
     private ImmutableList<CommandButton> buildCustomLayout() {
         ImmutableList.Builder<CommandButton> buttons = ImmutableList.builder();
+
+        // PodHead: clip the current moment straight from the notification / lock
+        // screen (defaults to "a bit ago" since you react + reach for the phone).
+        buttons.add(new CommandButton.Builder(CommandButton.ICON_UNDEFINED)
+                .setSessionCommand(SESSION_COMMAND_PODHEAD_CLIP)
+                .setCustomIconResId(R.drawable.ic_notification_clip)
+                .setDisplayName(context.getString(R.string.podhead_clip_label))
+                .build());
 
         buttons.add(new CommandButton.Builder(CommandButton.ICON_REWIND)
                 .setSessionCommand(SESSION_COMMAND_REWIND)
@@ -248,8 +260,49 @@ public class MediaLibrarySessionCallback implements MediaLibraryService.MediaLib
         } else if (customCommand.customAction.equals(SESSION_COMMAND_FAST_FORWARD.customAction)) {
             session.getPlayer().seekForward();
             return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
+        } else if (customCommand.customAction.equals(SESSION_COMMAND_PODHEAD_CLIP.customAction)) {
+            clipCurrentMoment(session);
+            return Futures.immediateFuture(new SessionResult(SessionResult.RESULT_SUCCESS));
         }
         return Futures.immediateFuture(new SessionResult(SessionError.ERROR_NOT_SUPPORTED));
+    }
+
+    /** PodHead: write a clip for the current episode + position from the notification. */
+    @UnstableApi
+    private void clipCurrentMoment(MediaSession session) {
+        Player player = session.getPlayer();
+        final int positionMs = (int) player.getCurrentPosition();
+        MediaItem item = player.getCurrentMediaItem();
+        if (item == null || item.mediaId == null) {
+            return;
+        }
+        final long mediaId;
+        try {
+            mediaId = Long.parseLong(item.mediaId);
+        } catch (NumberFormatException e) {
+            return;
+        }
+        disposables.add(Single.fromCallable(() -> {
+                    FeedMedia media = DBReader.getFeedMedia(mediaId);
+                    if (media == null) {
+                        return false;
+                    }
+                    FeedItem fi = media.getItem();
+                    Feed feed = fi != null ? fi.getFeed() : null;
+                    // notification clips default to "a bit ago": you react, then
+                    // reach for the phone, so the moment is ~a minute behind.
+                    ClipExporter.writeClip(context,
+                            feed != null ? feed.getDownloadUrl() : null,
+                            fi != null ? fi.getItemIdentifier() : null,
+                            media.getEpisodeTitle(), media.getFeedTitle(),
+                            positionMs, System.currentTimeMillis(),
+                            media.localFileAvailable() ? media.getLocalFileUrl() : null,
+                            "back1", 60);
+                    return true;
+                })
+                .subscribeOn(Schedulers.io())
+                .subscribe(ok -> Log.d(TAG, "PodHead notification clip @" + positionMs + "ms ok=" + ok),
+                        err -> Log.e(TAG, "PodHead notification clip failed", err)));
     }
 
     @Override

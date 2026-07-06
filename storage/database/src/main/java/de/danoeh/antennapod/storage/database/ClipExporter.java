@@ -1,4 +1,4 @@
-package de.danoeh.antennapod.podhead;
+package de.danoeh.antennapod.storage.database;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;
@@ -27,10 +27,10 @@ import java.util.Set;
  * user marked — plus (once per episode) a copy of the exact downloaded audio,
  * into the public <b>Download/PodHead/</b> folder so Syncthing can carry both to
  * the laptop. Because this app played the audio itself, the position maps 1:1
- * onto that file: no ad-insertion drift.
+ * onto that file — no ad-insertion drift.
  *
- * Whole episodes are copied for now; a later "prune" pass can delete old audio
- * once PodHead has verified the clips against it.
+ * Lives in storage:database so both the player UI (app) and the media session
+ * (playback:service, for the notification clip action) can call it.
  */
 public final class ClipExporter {
     private static final String TAG = "ClipExporter";
@@ -45,6 +45,8 @@ public final class ClipExporter {
     /**
      * @param localAudioPath the downloaded episode's file path, or null if the
      *                       episode was streamed (then no exact audio exists).
+     * @param mark           how far back the interesting bit was ("now" / "back1"
+     *                       / "back2"); {@code backSeconds} is the matching offset.
      */
     public static void writeClip(Context context, String feedUrl, String episodeGuid,
                                  String episodeTitle, String podcast, int positionMs,
@@ -67,7 +69,6 @@ public final class ClipExporter {
         json.put("positionMs", positionMs);
         json.put("capturedAt", capturedAt);
         json.put("audioFile", audioFile == null ? JSONObject.NULL : audioFile);
-        // how far back the interesting bit was, so PodHead biases the window
         json.put("mark", mark == null ? "now" : mark);
         json.put("focusOffsetSec", backSeconds);
         json.put("source", "podhead-player");
