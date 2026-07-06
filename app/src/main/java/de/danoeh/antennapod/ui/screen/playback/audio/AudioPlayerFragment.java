@@ -1,5 +1,6 @@
 package de.danoeh.antennapod.ui.screen.playback.audio;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -11,6 +12,7 @@ import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -52,6 +54,7 @@ import java.util.List;
 
 import de.danoeh.antennapod.BuildConfig;
 import de.danoeh.antennapod.R;
+import de.danoeh.antennapod.podhead.ClipExporter;
 import de.danoeh.antennapod.activity.MainActivity;
 import de.danoeh.antennapod.ui.common.Converter;
 import de.danoeh.antennapod.ui.screen.feed.preferences.SkipPreferenceDialog;
@@ -96,6 +99,8 @@ public class AudioPlayerFragment extends Fragment implements
     private ImageButton butFF;
     private TextView txtvFF;
     private ImageButton butSkip;
+    private ImageButton butClip;
+    private int lastPositionMs = Playable.INVALID_TIME;
     private MaterialToolbar toolbar;
     private ProgressBar progressIndicator;
     private CardView cardViewSeek;
@@ -136,6 +141,7 @@ public class AudioPlayerFragment extends Fragment implements
         butFF = root.findViewById(R.id.butFF);
         txtvFF = root.findViewById(R.id.txtvFF);
         butSkip = root.findViewById(R.id.butSkip);
+        butClip = root.findViewById(R.id.butClip);
         progressIndicator = root.findViewById(R.id.progLoading);
         cardViewSeek = root.findViewById(R.id.cardViewSeek);
         txtvSeek = root.findViewById(R.id.txtvSeek);
@@ -238,6 +244,39 @@ public class AudioPlayerFragment extends Fragment implements
                         MediaButtonStarter.createIntent(getContext(), KeyEvent.KEYCODE_MEDIA_NEXT));
             }
         });
+        butClip.setOnClickListener(v -> onClipTapped());
+    }
+
+    /**
+     * PodHead: capture the exact currently-playing episode + position and write
+     * a clip record. Because this app played the audio itself, the position maps
+     * 1:1 onto the downloaded file — no ad-insertion drift.
+     */
+    private void onClipTapped() {
+        final FeedMedia media = currentMedia;
+        if (media == null || media.getItem() == null) {
+            Toast.makeText(getContext(), R.string.podhead_clip_nothing, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final int positionMs = lastPositionMs != Playable.INVALID_TIME ? lastPositionMs : media.getPosition();
+        final FeedItem item = media.getItem();
+        final Feed feed = item.getFeed();
+        final String feedUrl = feed != null ? feed.getDownloadUrl() : null;
+        final String podcast = media.getFeedTitle();
+        final String episodeTitle = media.getEpisodeTitle();
+        final String guid = item.getItemIdentifier();
+        final long capturedAt = System.currentTimeMillis();
+        final Context appContext = getContext().getApplicationContext();
+        Schedulers.io().scheduleDirect(() -> {
+            try {
+                ClipExporter.writeClip(appContext, feedUrl, guid, episodeTitle, podcast, positionMs, capturedAt);
+            } catch (Exception e) {
+                Log.e(TAG, "PodHead clip failed", e);
+            }
+        });
+        Toast.makeText(getContext(),
+                getString(R.string.podhead_clip_saved, Converter.getDurationStringLong(positionMs)),
+                Toast.LENGTH_SHORT).show();
     }
 
     @Subscribe(threadMode = ThreadMode.MAIN)
@@ -371,6 +410,7 @@ public class AudioPlayerFragment extends Fragment implements
 
     @Subscribe(threadMode = ThreadMode.MAIN)
     public void updatePosition(PlaybackPositionEvent event) {
+        lastPositionMs = event.getPosition(); // PodHead: exact media position (ms), speed-independent
         if (txtvPosition == null || txtvLength == null || sbPosition == null) {
             return;
         }

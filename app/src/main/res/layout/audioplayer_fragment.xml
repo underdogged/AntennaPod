@@ -277,6 +277,21 @@
                     app:srcCompat="@drawable/ic_skip_48dp"
                     tools:srcCompat="@drawable/ic_skip_48dp" />
 
+                <ImageButton
+                    android:id="@+id/butClip"
+                    android:layout_width="@dimen/audioplayer_playercontrols_length"
+                    android:layout_height="@dimen/audioplayer_playercontrols_length"
+                    android:layout_centerVertical="true"
+                    android:layout_toEndOf="@id/butSkip"
+                    android:layout_toRightOf="@id/butSkip"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/podhead_clip_label"
+                    android:padding="8dp"
+                    android:scaleType="fitCenter"
+                    android:tint="?attr/action_icon_color"
+                    app:srcCompat="@drawable/ic_clip"
+                    tools:srcCompat="@drawable/ic_clip" />
+
             </RelativeLayout>
 
         </LinearLayout>
