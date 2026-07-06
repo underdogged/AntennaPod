@@ -99,7 +99,6 @@ public class AudioPlayerFragment extends Fragment implements
     private ImageButton butFF;
     private TextView txtvFF;
     private ImageButton butSkip;
-    private ImageButton butClip;
     private int lastPositionMs = Playable.INVALID_TIME;
     private MaterialToolbar toolbar;
     private ProgressBar progressIndicator;
@@ -141,13 +140,16 @@ public class AudioPlayerFragment extends Fragment implements
         butFF = root.findViewById(R.id.butFF);
         txtvFF = root.findViewById(R.id.txtvFF);
         butSkip = root.findViewById(R.id.butSkip);
-        butClip = root.findViewById(R.id.butClip);
         progressIndicator = root.findViewById(R.id.progLoading);
         cardViewSeek = root.findViewById(R.id.cardViewSeek);
         txtvSeek = root.findViewById(R.id.txtvSeek);
 
         setupLengthTextView();
         setupControlButtons();
+        // PodHead clip bar: how far back the interesting bit was (seconds).
+        root.findViewById(R.id.butClipNow).setOnClickListener(v -> onClipTapped("now", 0));
+        root.findViewById(R.id.butClipBack1).setOnClickListener(v -> onClipTapped("back1", 60));
+        root.findViewById(R.id.butClipBack2).setOnClickListener(v -> onClipTapped("back2", 120));
         final ImageButton butPlaybackSpeed = root.findViewById(R.id.butPlaybackSpeed);
         butPlaybackSpeed.setOnClickListener(v -> new VariableSpeedDialog().show(getChildFragmentManager(), null));
         sbPosition.setOnSeekBarChangeListener(this);
@@ -244,15 +246,15 @@ public class AudioPlayerFragment extends Fragment implements
                         MediaButtonStarter.createIntent(getContext(), KeyEvent.KEYCODE_MEDIA_NEXT));
             }
         });
-        butClip.setOnClickListener(v -> onClipTapped());
     }
 
     /**
      * PodHead: capture the exact currently-playing episode + position and write
      * a clip record. Because this app played the audio itself, the position maps
-     * 1:1 onto the downloaded file — no ad-insertion drift.
+     * 1:1 onto the downloaded file — no ad-insertion drift. {@code mark} says how
+     * far back the interesting bit was, so PodHead can bias the transcript window.
      */
-    private void onClipTapped() {
+    private void onClipTapped(String mark, int backSeconds) {
         final FeedMedia media = currentMedia;
         if (media == null || media.getItem() == null) {
             Toast.makeText(getContext(), R.string.podhead_clip_nothing, Toast.LENGTH_SHORT).show();
@@ -270,7 +272,8 @@ public class AudioPlayerFragment extends Fragment implements
         final Context appContext = getContext().getApplicationContext();
         Schedulers.io().scheduleDirect(() -> {
             try {
-                ClipExporter.writeClip(appContext, feedUrl, guid, episodeTitle, podcast, positionMs, capturedAt, localAudio);
+                ClipExporter.writeClip(appContext, feedUrl, guid, episodeTitle, podcast,
+                        positionMs, capturedAt, localAudio, mark, backSeconds);
             } catch (Exception e) {
                 Log.e(TAG, "PodHead clip failed", e);
             }

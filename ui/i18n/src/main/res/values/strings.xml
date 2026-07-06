@@ -306,7 +306,10 @@
     <string name="visit_social_interact_confirm_dialog_message">Please make sure that you trust the website \"%1$s\".</string>
     <string name="skip_episode_label">Skip episode</string>
     <string name="podhead_clip_label">Clip this moment</string>
-    <string name="podhead_clip_saved">Clipped at %1$s</string>
+    <string name="podhead_clip_now">just now</string>
+    <string name="podhead_clip_back1">◀ a bit ago</string>
+    <string name="podhead_clip_back2">◀◀ way back</string>
+    <string name="podhead_clip_saved">Clipped — %1$s</string>
     <string name="podhead_clip_nothing">Nothing is playing to clip</string>
     <string name="reset_playback_position_label">Reset playback position</string>
     <plurals name="reset_position_message">

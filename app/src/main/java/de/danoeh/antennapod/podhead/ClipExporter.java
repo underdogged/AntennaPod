@@ -48,7 +48,8 @@ public final class ClipExporter {
      */
     public static void writeClip(Context context, String feedUrl, String episodeGuid,
                                  String episodeTitle, String podcast, int positionMs,
-                                 long capturedAt, String localAudioPath) throws Exception {
+                                 long capturedAt, String localAudioPath,
+                                 String mark, int backSeconds) throws Exception {
         String audioFile = null;
         if (localAudioPath != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             try {
@@ -66,6 +67,9 @@ public final class ClipExporter {
         json.put("positionMs", positionMs);
         json.put("capturedAt", capturedAt);
         json.put("audioFile", audioFile == null ? JSONObject.NULL : audioFile);
+        // how far back the interesting bit was, so PodHead biases the window
+        json.put("mark", mark == null ? "now" : mark);
+        json.put("focusOffsetSec", backSeconds);
         json.put("source", "podhead-player");
         byte[] bytes = json.toString(2).getBytes(StandardCharsets.UTF_8);
         String fileName = "clip-" + capturedAt + ".json";
