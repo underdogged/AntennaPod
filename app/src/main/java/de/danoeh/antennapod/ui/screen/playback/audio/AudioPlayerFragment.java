@@ -265,11 +265,12 @@ public class AudioPlayerFragment extends Fragment implements
         final String podcast = media.getFeedTitle();
         final String episodeTitle = media.getEpisodeTitle();
         final String guid = item.getItemIdentifier();
+        final String localAudio = media.localFileAvailable() ? media.getLocalFileUrl() : null;
         final long capturedAt = System.currentTimeMillis();
         final Context appContext = getContext().getApplicationContext();
         Schedulers.io().scheduleDirect(() -> {
             try {
-                ClipExporter.writeClip(appContext, feedUrl, guid, episodeTitle, podcast, positionMs, capturedAt);
+                ClipExporter.writeClip(appContext, feedUrl, guid, episodeTitle, podcast, positionMs, capturedAt, localAudio);
             } catch (Exception e) {
                 Log.e(TAG, "PodHead clip failed", e);
             }
